@@ -4,23 +4,10 @@ import enStrings from './i18n/en.json'
 import fiStrings from './i18n/fi.json'
 import './App.css'
 
+import { Autocomplete, TextField } from '@mui/material'
+
 const currentYear = new Date().getFullYear()
 const yearOptions = Array.from({ length: currentYear - 2010 + 1 }, (_, index) => String(2010 + index))
-
-const sampleEventsByYear = {
-  2024: [
-    { id: '2024_esijukola_h', name: 'Esijukola H 2024' },
-    { id: '2024_jukola', name: 'Jukola 2024' }
-  ],
-  2025: [
-    { id: '2025_esijukola_h', name: 'Esijukola H 2025' },
-    { id: '2025_jukola', name: 'Jukola 2025' }
-  ],
-  2026: [
-    { id: '2026_esijukola_h', name: 'Esijukola H 2026' },
-    { id: '2026_jukola', name: 'Jukola 2026' }
-  ]
-}
 
 const localeStrings = {
   fi: fiStrings,
@@ -574,29 +561,23 @@ function App() {
         </div>
 
         <div className="field-group">
-          <label htmlFor="participant-a">{texts.participantA}</label>
-          <select
-            id="participant-a"
-            value={participantA}
-            onChange={(event) => setParticipantA(event.target.value)}
+          <Autocomplete
+            disablePortal
+            onChange={(event, value) => setParticipantA(value?.id)}
+            options={competitors.map((competitor) => ({ label: competitor.name, id: competitor.id }))}
             disabled={!eventId || loadingEventData || !competitors.length}
-          >
-            <option value="">{texts.selectFirstParticipant}</option>
-            {competitors.map((participant) => renderParticipantOption(participant))}
-          </select>
+            renderInput={(params) => <TextField {...params} label={texts.participantA} />}
+          />
         </div>
 
         <div className="field-group">
-          <label htmlFor="participant-b">{texts.participantB}</label>
-          <select
-            id="participant-b"
-            value={participantB}
-            onChange={(event) => setParticipantB(event.target.value)}
+          <Autocomplete
+            disablePortal
+            onChange={(event, value) => setParticipantB(value?.id)}
+            options={competitors.map((competitor) => ({ label: competitor.name, id: competitor.id }))}
             disabled={!eventId || loadingEventData || !competitors.length}
-          >
-            <option value="">{texts.selectSecondParticipant}</option>
-            {competitors.map((participant) => renderParticipantOption(participant))}
-          </select>
+            renderInput={(params) => <TextField {...params} label={texts.participantB} />}
+          />
         </div>
       </section>
 
