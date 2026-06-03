@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import resultsService from './services/results'
+import enStrings from './i18n/en.json'
+import fiStrings from './i18n/fi.json'
 import './App.css'
 
 const currentYear = new Date().getFullYear()
@@ -21,92 +23,8 @@ const sampleEventsByYear = {
 }
 
 const localeStrings = {
-  fi: {
-    languageLabel: 'Kieli',
-    finnish: 'Suomi',
-    english: 'English',
-    pageTitle: '1 v 1 väliaikavertailu',
-    pageDescription: 'Valitse vuosi ja tapahtuma, ja vertaile kahta osallistujaa rinnakkain.',
-    year: 'Vuosi',
-    chooseYear: 'Valitse vuosi',
-    event: 'Tapahtuma',
-    chooseEvent: 'Valitse tapahtuma',
-    selectYearFirst: 'Valitse ensin vuosi',
-    loadingEvents: 'Ladataan tapahtumia…',
-    loadingEventData: 'Ladataan tapahtuman kilpailijoita ja tuloksia…',
-    participantA: 'Kilpailija',
-    participantB: 'Vastus',
-    selectFirstParticipant: 'Valitse ensimmäinen osallistuja',
-    selectSecondParticipant: 'Valitse toinen osallistuja',
-    comparison: 'Vertailu',
-    nameLabel: 'Nimi',
-    resultLabel: 'Aika',
-    rankLabel: 'Sijoitus',
-    headToHeadDifference: 'Väliaikavertailu',
-    comparisonUnavailable: 'Vertailu ei ole käytettävissä',
-    splitTime: 'Väliajat',
-    cumulativeTime: 'Kokonaisaika',
-    tableView: 'Taulukko',
-    barChart: 'Väliaikavertailu',
-    lineGraph: 'Kokonaiseron vertailu',
-    noSharedSplits: 'Yhteisiä välejä ei löytynyt.',
-    unableToLoad: 'Tapahtuman kilpailijoiden tai tulosten lataus epäonnistui.',
-    resultsNotAvailable: 'Tuloksia ei ole vielä saatavilla yhdelle tai useammalle osallistujalle.',
-    startLabel: 'Lähtö',
-    endLabel: 'Maali',
-    zeroLabel: '0',
-    unknown: 'Tuntematon',
-    cumulativeDifferenceProgression: 'Kokonaiseron kehitys',
-    timeDifferenceBySector: 'Aikaero väleittäin',
-    sharedSplitComparison: 'Yhteisten välien vertailu',
-    splitPoint: 'Koodi',
-    sectorIndex: 'Numero',
-    difference: 'Ero välillä',
-    cumulative: 'Kokonaisero'
-  },
-  en: {
-    languageLabel: 'Language',
-    finnish: 'Finnish',
-    english: 'English',
-    pageTitle: 'Head-to-head split comparison',
-    pageDescription: 'Select a year and event, then compare two participants side by side.',
-    year: 'Year',
-    chooseYear: 'Choose year',
-    event: 'Event',
-    chooseEvent: 'Choose event',
-    selectYearFirst: 'Select year first',
-    loadingEvents: 'Loading events…',
-    loadingEventData: 'Loading event competitors and results…',
-    participantA: 'Participant A',
-    participantB: 'Participant B',
-    selectFirstParticipant: 'Select first participant',
-    selectSecondParticipant: 'Select second participant',
-    comparison: 'Comparison',
-    nameLabel: 'Name',
-    resultLabel: 'Result',
-    rankLabel: 'Rank',
-    headToHeadDifference: 'Head-to-head difference',
-    comparisonUnavailable: 'Comparison unavailable',
-    splitTime: 'Split time',
-    cumulativeTime: 'Cumulative time',
-    tableView: 'Table',
-    barChart: 'Bar chart',
-    lineGraph: 'Line graph',
-    noSharedSplits: 'No shared split sectors are available for comparison.',
-    unableToLoad: 'Unable to load competitors or results for the selected event.',
-    resultsNotAvailable: 'Results are not available for one or both participants yet.',
-    startLabel: 'Start',
-    endLabel: 'End',
-    zeroLabel: '0',
-    unknown: 'Unknown',
-    cumulativeDifferenceProgression: 'Cumulative difference progression',
-    timeDifferenceBySector: 'Time difference by sector',
-    sharedSplitComparison: 'Shared split sector comparison',
-    splitPoint: 'Split point',
-    sectorIndex: 'Order',
-    difference: 'Difference',
-    cumulative: 'Cumulative'
-  }
+  fi: fiStrings,
+  en: enStrings
 }
 
 const normalizeEventList = (data) => {
