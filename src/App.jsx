@@ -20,6 +20,8 @@ import { Autocomplete, TextField } from '@mui/material'
 const currentYear = new Date().getFullYear()
 const yearOptions = Array.from({ length: currentYear - 2010 + 1 }, (_, index) => String(2010 + index))
 
+const issueBaseUrl = 'https://github.com/jarvena/result-1v1/issues/new'
+
 const localeStrings = {
   fi: fiStrings,
   en: enStrings
@@ -564,6 +566,17 @@ function App() {
     </div>
   )
 
+  const feedbackUrl = (() => {
+    const selectedEvent = events.find((item) => item.id === eventId)
+    const context = [
+      `- ${texts.event}: ${selectedEvent ? `${selectedEvent.name} (${eventId})` : '-'}`,
+      ...(filterByRace ? [`- ${texts.raceDay}: ${raceNo ?? '-'}`] : []),
+      `- URL: ${window.location.href}`
+    ]
+    const params = new URLSearchParams({ body: `${texts.feedbackIssueBody}\n\n${context.join('\n')}\n` })
+    return `${issueBaseUrl}?${params}`
+  })()
+
   return (
     <main className="h2h-app">
       <header className="page-header">
@@ -731,6 +744,13 @@ function App() {
           )}
         </section>
       )}
+
+      <footer className="feedback-footer">
+        <p>{texts.feedbackPrompt}</p>
+        <a className="feedback-button" href={feedbackUrl} target="_blank" rel="noopener noreferrer">
+          {texts.feedbackButton}
+        </a>
+      </footer>
     </main>
   )
 }

@@ -43,5 +43,8 @@
     "raceDay": "Kilpailupäivä",
     "leg": "osuus",
     "classLabel": "Sarja",
-    "loadingSplits": "Ladataan väliaikoja…"
+    "loadingSplits": "Ladataan väliaikoja…",
+    "feedbackPrompt": "Eikö jokin toimi oikein tai eikö tapahtuma lataudu? Kerro siitä GitHubissa.",
+    "feedbackButton": "Ilmoita ongelmasta",
+    "feedbackIssueBody": "Kuvaile ongelma ja miten sen saa toistettua:"
 }
