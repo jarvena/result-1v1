@@ -227,12 +227,21 @@
   grid-template-columns: repeat(2, minmax(220px, 1fr));
   gap: 20px;
   margin-bottom: 32px;
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field-group {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Spans the whole row so the participant selections stay paired side by side */
+.field-group--full {
+  grid-column: 1 / -1;
 }
 
 .field-group label {

@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import resultsService from './services/results'
+import {
+  buildLookups,
+  getEventInfo,
+  normalizeEventList,
+  parseCompetitorRace,
+  parseIndividualCompetitors,
+  findCompetitorRace,
+  parseIndividualResults,
+  parseRelayResultList,
+  parseRelayResults
+} from './services/parsers'
 import enStrings from './i18n/en.json'
 import fiStrings from './i18n/fi.json'
 import './App.css'
@@ -13,70 +24,6 @@ const localeStrings = {
   fi: fiStrings,
   en: enStrings
 }
-
-const normalizeEventList = (data) => {
-  console.log('events', data)
-  if (!data) return []
-  if (Array.isArray(data)) {
-    return data.map((item) => ({
-      id: item.EventID, // || item.id || item.eventId,
-      name: item.EventTitle // || item.EventName || item.NameFi || item.name || item.Description || item.Title || `${item.ID}`
-    }))
-  }
-
-  const candidates = data.data || data.events || []
-  if (Array.isArray(candidates)) {
-    return candidates.filter((event) => event.Discipline === 'Orienteering' && event.AllowFollowAll === true && event.EventType === 'Individual').map((item) => ({
-      id: item.EventID, // || item.id || item.eventId,
-      name: item.EventTitle // || item.EventName || item.NameFi || item.name || item.Description || item.Title || `${item.ID}`
-    }))
-  }
-
-  return []
-}
-
-const normalizeCompetitors = (data) => {
-  console.log('competitors', data)
-  const list = data?.Competitors // || data?.competitors || data?.Items || data?.items || data || []
-  if (!Array.isArray(list)) return []
-  return list.map((item) => ({
-    id: item[0],
-    bib: item[3],
-    name:
-      `${item[8] || ''} ${item[7] || ''}`.trim()
-  }))
-}
-
-const getSplitTotalTime = (splits) => {
-  if (!Array.isArray(splits) || !splits.length) return undefined
-  const lastSplit = splits[splits.length - 1]
-  return Array.isArray(lastSplit) ? lastSplit[6] : undefined
-}
-
-const getSplitRank = (splits) => {
-  if (!Array.isArray(splits) || !splits.length) return undefined
-  const lastSplit = splits[splits.length - 1]
-  return Array.isArray(lastSplit) ? lastSplit[8] : undefined
-}
-
-const normalizeResults = (data) => {
-  console.log('results', data)
-  const results = data?.Results || data?.results || data?.CompetitorResults || data?.items || data || []
-  const list = results.flatMap((competitionClass) => {
-    return competitionClass?.Splits?.map((result, index) => ({
-      raceNo: competitionClass.RaceNo,
-      classId: competitionClass.ClassID,
-      bib: competitionClass.Results.find((res) => res[0] === result[0])?.[9],
-      runnerId: result[0],
-      splits: result[1],
-      TotalTime: getSplitTotalTime(result[1]),
-      Rank: getSplitRank(result[1])
-    }))
-  })
-  return Array.isArray(list) ? list : []
-}
-
-const getValue = (item, keys) => keys.reduce((value, key) => value ?? item?.[key], undefined)
 
 const formatTime = (value) => {
   if (value == null || value === '') return '-'
@@ -407,104 +354,215 @@ const SplitComparisonTable = ({ participantAName, participantBName, sharedSplits
   )
 }
 
-const findParticipantResult = (participantId, results) => {
-  if (!participantId || !results?.length) return undefined
-  return results.find((result) => {
-    const bib = getValue(result, ['runnerId']) // 'Bib', 'ID', 'BaseBib', 'CompetitorID', 'BibNumber', 'bib', 'id'])
-    return String(bib) === String(participantId)
-  })
-}
-
 function App() {
   const [year, setYear] = useState(String(currentYear))
   const [eventId, setEventId] = useState('')
   const [events, setEvents] = useState([])
-  const [competitors, setCompetitors] = useState([])
-  const [results, setResults] = useState([])
-  const [loadingEvents, setLoadingEvents] = useState(false)
+  const [eventData, setEventData] = useState(null)
+  const [raceNo, setRaceNo] = useState(null)
+  const [competitorDetails, setCompetitorDetails] = useState({})
+  const [loadingEvents, setLoadingEvents] = useState(true)
   const [loadingEventData, setLoadingEventData] = useState(false)
-  const [participantA, setParticipantA] = useState('')
-  const [participantB, setParticipantB] = useState('')
+  const [participantA, setParticipantA] = useState(null)
+  const [participantB, setParticipantB] = useState(null)
   const [timeDisplayMode, setTimeDisplayMode] = useState('split')
   const [viewMode, setViewMode] = useState('table')
   const [locale, setLocale] = useState('fi')
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState(false)
   const texts = localeStrings[locale]
 
-  useEffect(() => {
-    setEventId('')
-    setCompetitors([])
-    setResults([])
-    setParticipantA('')
-    setParticipantB('')
-    setError('')
-    if (!year) {
-      setEvents([])
-      return
-    }
+  const resetEventState = () => {
+    setEventData(null)
+    setRaceNo(null)
+    setCompetitorDetails({})
+    setParticipantA(null)
+    setParticipantB(null)
+    setLoadError(false)
+  }
 
-    setLoadingEvents(true)
+  const handleYearChange = (newYear) => {
+    if (newYear === year) return
+    resetEventState()
+    setYear(newYear)
+    setEventId('')
+    setEvents([])
+    setLoadingEvents(Boolean(newYear))
+  }
+
+  const handleEventChange = (newEventId) => {
+    if (newEventId === eventId) return
+    resetEventState()
+    setEventId(newEventId)
+    setLoadingEventData(Boolean(newEventId))
+  }
+
+  useEffect(() => {
+    if (!year) return
+
     resultsService
       .getEvents(year)
-      .then((response) => {
-        const normalized = normalizeEventList(response?.data)
-        if (normalized.length) {
-          setEvents(normalized)
-        } else {
-          setEvents(sampleEventsByYear[year] || [])
-        }
-      })
-      .catch(() => {
-        setEvents(sampleEventsByYear[year] || [])
-      })
+      .then((response) => setEvents(normalizeEventList(response?.data)))
+      .catch(() => setEvents([]))
       .finally(() => setLoadingEvents(false))
   }, [year])
 
   useEffect(() => {
-    if (!eventId) {
-      setCompetitors([])
-      setResults([])
-      setParticipantA('')
-      setParticipantB('')
-      return
-    }
+    if (!eventId) return
 
-    setLoadingEventData(true)
-    setError('')
+    let cancelled = false
     Promise.all([
-      resultsService.getCompetitors(eventId),
-      resultsService.getResults(eventId)
+      resultsService.getEvent(eventId),
+      resultsService.getCompetitors(eventId)
     ])
-      .then(([competitorResponse, resultResponse]) => {
-        const normalizedCompetitors = normalizeCompetitors(competitorResponse?.data)
-        const normalizedResults = normalizeResults(resultResponse?.data)
-        setCompetitors(normalizedCompetitors)
-        setResults(normalizedResults)
+      .then(async ([eventResponse, competitorResponse]) => {
+        const info = getEventInfo(eventResponse?.data)
+        // Events with AllowFollowAll publish all splits in one results file, others only per
+        // competitor or relay team (fetched once participants are selected). Relays without the
+        // results file list their runners in a separate result list.
+        const isTeamMode = !info.followAll && info.type === 'Relay'
+        const [resultResponse, resultListResponse] = await Promise.all([
+          info.followAll ? resultsService.getResults(eventId) : null,
+          isTeamMode ? resultsService.getResultList(eventId) : null
+        ])
+        if (cancelled) return
+        setEventData({
+          info,
+          competitors: competitorResponse?.data,
+          results: resultResponse?.data,
+          resultList: resultListResponse?.data
+        })
+        setRaceNo(info.currentRace ?? null)
       })
       .catch(() => {
-        setError(localeStrings[locale].unableToLoad)
+        if (!cancelled) setLoadError(true)
       })
-      .finally(() => setLoadingEventData(false))
-  }, [eventId, locale])
+      .finally(() => {
+        if (!cancelled) setLoadingEventData(false)
+      })
 
-  const selectedParticipantA = findParticipantResult(participantA, results)
-  const selectedParticipantB = findParticipantResult(participantB, results)
+    return () => {
+      cancelled = true
+    }
+  }, [eventId])
 
-  const renderParticipantOption = (participant) => (
-    <option key={participant.id} value={participant.id}>
-      {participant.name}
-    </option>
-  )
+  const eventInfo = eventData?.info
+  const isRelay = eventInfo?.type === 'Relay'
+  const filterByRace = Boolean(eventInfo && !isRelay && eventInfo.races.length > 1)
+
+  const entries = useMemo(() => {
+    if (!eventData?.results) return []
+    const { info, competitors, results } = eventData
+    const lookups = buildLookups(competitors)
+    return info.type === 'Relay'
+      ? parseRelayResults(results, lookups, info.classNames, info.precision, texts.leg)
+      : parseIndividualResults(results, lookups, info.classNames, info.precision)
+  }, [eventData, texts.leg])
+
+  const participantOptions = useMemo(() => {
+    if (!eventData) return []
+    if (!eventData.info.followAll) {
+      const lookups = buildLookups(eventData.competitors)
+      return eventData.info.type === 'Relay'
+        ? parseRelayResultList(eventData.resultList, lookups, eventData.info.classNames, texts.leg)
+        : parseIndividualCompetitors(eventData.competitors, lookups)
+    }
+    const options = new Map()
+    entries
+      .filter((entry) => !filterByRace || entry.raceNo === raceNo)
+      .forEach((entry) => {
+        if (!options.has(entry.key)) options.set(entry.key, { id: entry.key, name: entry.name, label: entry.label })
+      })
+    return [...options.values()]
+  }, [eventData, entries, filterByRace, raceNo, texts.leg])
+
+  // Per-competitor mode: splits are fetched for the selected participants only
+  const missingBaseBibs = eventInfo && !eventInfo.followAll
+    ? [...new Set([participantA, participantB]
+      .map((participant) => participant?.baseBib)
+      .filter((baseBib) => baseBib != null && !(baseBib in competitorDetails)))]
+    : []
+  const missingBaseBibsKey = missingBaseBibs.join(',')
+  const loadingSplits = missingBaseBibs.length > 0
+
+  useEffect(() => {
+    if (!eventId || !missingBaseBibsKey) return
+
+    let cancelled = false
+    Promise.all(
+      missingBaseBibsKey.split(',').map((baseBib) =>
+        resultsService
+          .getCompetitorDetails(eventId, baseBib)
+          .then((response) => [baseBib, response?.data ?? null])
+          .catch(() => [baseBib, null])
+      )
+    )
+      .then((loaded) => {
+        if (cancelled) return
+        setCompetitorDetails((previous) => ({ ...previous, ...Object.fromEntries(loaded) }))
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [eventId, missingBaseBibsKey])
+
+  const resolveEntry = (participant) => {
+    if (!participant || !eventInfo) return undefined
+    if (eventInfo.followAll) {
+      return entries.find((entry) => entry.key === participant.id && (!filterByRace || entry.raceNo === raceNo))
+    }
+    const race = findCompetitorRace(competitorDetails[participant.baseBib], participant.leg ?? raceNo)
+    return parseCompetitorRace(race, participant)
+  }
+
+  const selectedParticipantA = resolveEntry(participantA)
+  const selectedParticipantB = resolveEntry(participantB)
 
   const compareTime = () => {
-    const timeA = getValue(selectedParticipantA ?? {}, ['TotalTime', 'ResultTime', 'Time', 'TimeSeconds', 'Seconds'])
-    const timeB = getValue(selectedParticipantB ?? {}, ['TotalTime', 'ResultTime', 'Time', 'TimeSeconds', 'Seconds'])
-    const numericA = Number(timeA)
-    const numericB = Number(timeB)
-    if (Number.isNaN(numericA) || Number.isNaN(numericB)) return null
+    const numericA = Number(selectedParticipantA?.TotalTime)
+    const numericB = Number(selectedParticipantB?.TotalTime)
+    if (!Number.isFinite(numericA) || !Number.isFinite(numericB)) return null
     const diff = Math.abs(numericA - numericB)
     return formatTime(diff)
   }
+
+  const participantDisabled = !eventId || loadingEventData || !participantOptions.length
+
+  const renderParticipantSelect = (label, value, onChange) => (
+    <Autocomplete
+      disablePortal
+      value={value}
+      onChange={(event, option) => onChange(option)}
+      options={participantOptions}
+      getOptionLabel={(option) => option.label}
+      isOptionEqualToValue={(option, selected) => option.id === selected.id}
+      renderOption={(props, option) => {
+        // eslint-disable-next-line no-unused-vars
+        const { key, ...optionProps } = props
+        return (
+          <li key={option.id} {...optionProps}>
+            {option.label}
+          </li>
+        )
+      }}
+      disabled={participantDisabled}
+      renderInput={(params) => <TextField {...params} label={label} />}
+    />
+  )
+
+  const renderResultCard = (title, participant, entry) => (
+    <div className="result-card">
+      <h3>{title}</h3>
+      <p className="result-label">{texts.nameLabel}</p>
+      <p>{participant?.name || texts.unknown}</p>
+      <p className="result-label">{texts.classLabel}</p>
+      <p>{entry?.className || '-'}</p>
+      <p className="result-label">{texts.resultLabel}</p>
+      <p>{formatTime(entry?.TotalTime)}</p>
+      <p className="result-label">{texts.rankLabel}</p>
+      <p>{entry?.Rank ?? '-'}</p>
+    </div>
+  )
 
   return (
     <main className="h2h-app">
@@ -530,7 +588,7 @@ function App() {
           <select
             id="year-select"
             value={year}
-            onChange={(event) => setYear(event.target.value)}
+            onChange={(event) => handleYearChange(event.target.value)}
           >
             <option value="">{texts.chooseYear}</option>
             {yearOptions.map((yearOption) => (
@@ -546,7 +604,7 @@ function App() {
           <select
             id="event-select"
             value={eventId}
-            onChange={(event) => setEventId(event.target.value)}
+            onChange={(event) => handleEventChange(event.target.value)}
             disabled={!year || loadingEvents}
           >
             <option value="">
@@ -560,28 +618,33 @@ function App() {
           </select>
         </div>
 
+        {filterByRace && (
+          <div className="field-group field-group--full">
+            <label htmlFor="race-select">{texts.raceDay}</label>
+            <select
+              id="race-select"
+              value={raceNo ?? ''}
+              onChange={(event) => setRaceNo(Number(event.target.value))}
+            >
+              {eventInfo.races.map((race) => (
+                <option key={race.raceNo} value={race.raceNo}>
+                  {[race.title, race.date].filter(Boolean).join(', ')}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="field-group">
-          <Autocomplete
-            disablePortal
-            onChange={(event, value) => setParticipantA(value?.id)}
-            options={competitors.map((competitor) => ({ label: competitor.name, id: competitor.id }))}
-            disabled={!eventId || loadingEventData || !competitors.length}
-            renderInput={(params) => <TextField {...params} label={texts.participantA} />}
-          />
+          {renderParticipantSelect(texts.participantA, participantA, setParticipantA)}
         </div>
 
         <div className="field-group">
-          <Autocomplete
-            disablePortal
-            onChange={(event, value) => setParticipantB(value?.id)}
-            options={competitors.map((competitor) => ({ label: competitor.name, id: competitor.id }))}
-            disabled={!eventId || loadingEventData || !competitors.length}
-            renderInput={(params) => <TextField {...params} label={texts.participantB} />}
-          />
+          {renderParticipantSelect(texts.participantB, participantB, setParticipantB)}
         </div>
       </section>
 
-      {error && <p className="error-message">{error}</p>}
+      {loadError && <p className="error-message">{texts.unableToLoad}</p>}
 
       {loadingEventData && <p className="status-message">{texts.loadingEventData}</p>}
 
@@ -589,25 +652,8 @@ function App() {
         <section className="comparison-panel">
           <h2>{texts.comparison}</h2>
           <div className="comparison-grid">
-            <div className="result-card">
-              <h3>{texts.participantA}</h3>
-              <p className="result-label">{texts.nameLabel}</p>
-              <p>{competitors.find((item) => String(item.id) === String(participantA))?.name || texts.unknown}</p>
-              <p className="result-label">{texts.resultLabel}</p>
-              <p>{formatTime(getSplitTotalTime(selectedParticipantA?.splits))}</p>
-              <p className="result-label">{texts.rankLabel}</p>
-              <p>{getValue(selectedParticipantA ?? {}, ['Rank', 'Position', 'Place']) ?? '-'}</p>
-            </div>
-
-            <div className="result-card">
-              <h3>{texts.participantB}</h3>
-              <p className="result-label">{texts.nameLabel}</p>
-              <p>{competitors.find((item) => String(item.id) === String(participantB))?.name || texts.unknown}</p>
-              <p className="result-label">{texts.resultLabel}</p>
-              <p>{formatTime(getSplitTotalTime(selectedParticipantB?.splits))}</p>
-              <p className="result-label">{texts.rankLabel}</p>
-              <p>{getValue(selectedParticipantB ?? {}, ['Rank', 'Position', 'Place']) ?? '-'}</p>
-            </div>
+            {renderResultCard(texts.participantA, participantA, selectedParticipantA)}
+            {renderResultCard(texts.participantB, participantB, selectedParticipantB)}
           </div>
 
           {selectedParticipantA && selectedParticipantB ? (
@@ -671,17 +717,17 @@ function App() {
                 </label>
               </div>
               <SplitComparisonTable
-                participantAName={competitors.find((item) => String(item.id) === String(participantA))?.name || texts.participantA}
-                participantBName={competitors.find((item) => String(item.id) === String(participantB))?.name || texts.participantB}
-                sharedSplits={getSharedSplitSectors(selectedParticipantA?.splits, selectedParticipantB?.splits)}
+                participantAName={participantA.name || texts.participantA}
+                participantBName={participantB.name || texts.participantB}
+                sharedSplits={getSharedSplitSectors(selectedParticipantA.splits, selectedParticipantB.splits)}
                 timeDisplayMode={timeDisplayMode}
                 viewMode={viewMode}
                 texts={texts}
-                participantASplits={selectedParticipantA?.splits}
+                participantASplits={selectedParticipantA.splits}
               />
             </>
           ) : (
-            <p className="status-message">{texts.resultsNotAvailable}</p>
+            <p className="status-message">{loadingSplits ? texts.loadingSplits : texts.resultsNotAvailable}</p>
           )}
         </section>
       )}

@@ -39,5 +39,9 @@
     "splitPoint": "Koodi",
     "sectorIndex": "Numero",
     "difference": "Ero välillä",
-    "cumulative": "Kokonaisero"
+    "cumulative": "Kokonaisero",
+    "raceDay": "Kilpailupäivä",
+    "leg": "osuus",
+    "classLabel": "Sarja",
+    "loadingSplits": "Ladataan väliaikoja…"
 }

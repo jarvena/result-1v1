@@ -39,5 +39,9 @@
     "splitPoint": "Split point",
     "sectorIndex": "Order",
     "difference": "Difference",
-    "cumulative": "Cumulative"
+    "cumulative": "Cumulative",
+    "raceDay": "Race day",
+    "leg": "leg",
+    "classLabel": "Class",
+    "loadingSplits": "Loading splits…"
 }

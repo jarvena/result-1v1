@@ -23,10 +23,9 @@ const getResults = (eventId="2024_esijukola_h") => {
     return response
 }
 
-const getMultidayresultsForDay = (eventData, day) => {
-    return eventData.Classes.map(competitionClass => {
-        return axios.get(`${baseUrl}/tulokset-new/online/online_${eventData.Headers.EventID}_results_${competitionClass.ID}_${day}.json`)
-    })
+const getResultList = (eventId) => {
+    const response = axios.get(`${baseUrl}/tulokset-new/online/online_${eventId}_resultlist.json`)
+    return response
 }
 
 const getCompetitorDetails = (eventId, competitorBib) => {
@@ -34,4 +33,4 @@ const getCompetitorDetails = (eventId, competitorBib) => {
     return response
 }
 
-export default { getEvents, getEvent, getCompetitors, getResults, getMultidayresultsForDay, getCompetitorDetails }
+export default { getEvents, getEvent, getCompetitors, getResults, getResultList, getCompetitorDetails }
